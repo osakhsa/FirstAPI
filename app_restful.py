@@ -24,16 +24,29 @@ class Item(Resource):
         if len(asked_item) == 1:
             return asked_item[0]
         elif asked_item == ():
-            return jsonify({'message': "Item wasn't found"})
+            return {'message': "Item wasn't found"}, 405
         else:
-            return jsonify({'message': "Database error"})
-        # return jsonify({'type': str(type(asked_item)), 'value': str(asked_item)})
+            return {'message': "Database error"}, 500
 
     def post(self, name):
-        pass
+        asked_item = tuple(filter(lambda i: i['name'] == name, store))
+        if asked_item == ():
+            new_item = {'name': name, 'price': request.get_json()['price']}
+            store.append(new_item)
+            return new_item, 201
+        else:
+            return {'message': "Item already exists"}, 405
+
+    def put(self, name):
+        asked_item = tuple(filter(lambda i: i['name'] == name, store))
 
     def delete(self, name):
-        pass
+        asked_item = tuple(filter(lambda i: i['name'] == name, store))
+        if asked_item == ():
+            return {'message': "Item wasn't found"}, 405
+        else:
+            store.remove(asked_item[0])
+            return {}, 204
 
 
 api.add_resource(ItemList, "/items")
