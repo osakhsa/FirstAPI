@@ -8,15 +8,24 @@ store = [
 
 app = Flask(__name__)
 api = Api(app)
-parser = reqparse.RequestParser()
+parser_one = reqparse.RequestParser()
+parser_one.add_argument('price', required=True)
+parser_two = reqparse.RequestParser()
+parser_two.add_argument('items_to_add', type=dict, action="append")
 
 
 class ItemList(Resource):
     def get(self):
         return store
 
-    def post(self, data):
-        pass
+    def post(self):
+        data = parser_two.parse_args()
+        items_to_add = data['items_to_add']
+        for i in items_to_add:
+            item = dict(i)
+            if 'name' in item and 'price' in item:
+                store.append(i)
+        return store, 201
 
 
 class Item(Resource):
@@ -32,10 +41,7 @@ class Item(Resource):
     def post(self, name):
         asked_item = tuple(filter(lambda i: i['name'] == name, store))
         if asked_item == ():
-            parser.add_argument('price')
-            data = parser.parse_args()
-            if not data['price']:
-                return {'message': 'Price isn\'t given'}, 400
+            data = parser_one.parse_args()
             new_item = {'name': name, 'price': data['price']}
             store.append(new_item)
             return new_item, 201
@@ -44,10 +50,7 @@ class Item(Resource):
 
     def put(self, name):
         asked_item = tuple(filter(lambda i: i['name'] == name, store))
-        parser.add_argument('price')
-        data = parser.parse_args()
-        if not data['price']:
-            return {'message': 'Price isn\'t given'}, 400
+        data = parser_one.parse_args()
         if asked_item == ():
             new_item = {'name': name, 'price': data['price']}
             store.append(new_item)
