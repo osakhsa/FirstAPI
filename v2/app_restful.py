@@ -8,27 +8,42 @@ store = [
 
 app = Flask(__name__)
 api = Api(app)
-parser_one = reqparse.RequestParser()
-parser_one.add_argument('price', required=True)
-parser_two = reqparse.RequestParser()
-parser_two.add_argument('items_to_add', type=dict, action="append")
 
 
 class ItemList(Resource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('items_to_add', type=dict, action="append")
+
     def get(self):
         return store
 
     def post(self):
-        data = parser_two.parse_args()
+        ready = []
+        data = self.parser.parse_args()
         items_to_add = data['items_to_add']
         for i in items_to_add:
             item = dict(i)
             if 'name' in item and 'price' in item:
-                store.append(i)
-        return store, 201
+                    asked_item = tuple(filter(lambda i: i['name'] == item['name'], store))
+                    if asked_item == ():
+                        ready.append(i)
+                    elif len(asked_item) != 1:
+                        return {'message': "Database error"}, 500
+        if ready == items_to_add:
+            store.extend(ready)
+            return store, 201
+        elif not ready:
+            return {'message': "All elements are given in incorrect form or exist in the store"}, 400
+        else:
+            store.extend(ready)
+            return {'message': "Some elements are given in incorrect form or exist in the store",
+                    'store': store}, 201
 
 
 class Item(Resource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('price', required=True)
+
     def get(self, name):
         asked_item = tuple(filter(lambda i: i['name'] == name, store))
         if len(asked_item) == 1:
@@ -41,7 +56,7 @@ class Item(Resource):
     def post(self, name):
         asked_item = tuple(filter(lambda i: i['name'] == name, store))
         if asked_item == ():
-            data = parser_one.parse_args()
+            data = self.parser.parse_args()
             new_item = {'name': name, 'price': data['price']}
             store.append(new_item)
             return new_item, 201
@@ -50,7 +65,7 @@ class Item(Resource):
 
     def put(self, name):
         asked_item = tuple(filter(lambda i: i['name'] == name, store))
-        data = parser_one.parse_args()
+        data = self.parser.parse_args()
         if asked_item == ():
             new_item = {'name': name, 'price': data['price']}
             store.append(new_item)
