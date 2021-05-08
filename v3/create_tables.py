@@ -1,0 +1,10 @@
+import sqlite3
+con = sqlite3.connect('data.db')
+cur = con.cursor()
+cur.execute('CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY ASC, name TEXT UNIQUE, price REAL)')
+cur.execute('INSERT INTO items VALUES (null, "chair", 1500)')
+cur.execute('INSERT INTO items VALUES (null, "cupboard", 3000)')
+cur.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY ASC, username TEXT, password TEXT)')
+cur.execute('INSERT INTO users VALUES (null, "Stepan", "123456")')
+con.commit()
+con.close()
