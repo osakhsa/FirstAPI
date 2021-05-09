@@ -2,10 +2,6 @@ from flask import Flask
 from flask_restful import Resource, Api, reqparse
 import sqlite3
 
-store = [
-    {'name': "chair", 'price': 1500},
-    {'name': "cupboard", 'price': 3000},
-]
 
 app = Flask(__name__)
 api = Api(app)
@@ -30,23 +26,36 @@ class ItemList(Resource):
         ready = []
         data = self.parser.parse_args()
         items_to_add = data['items_to_add']
+        con = sqlite3.connect('data.db')
+        cur = con.cursor()
         for i in items_to_add:
             item = dict(i)
             if 'name' in item and 'price' in item:
-                    asked_item = tuple(filter(lambda i: i['name'] == item['name'], store))
-                    if asked_item == ():
-                        ready.append(i)
-                    elif len(asked_item) != 1:
-                        return {'message': "Database error"}, 500
+                cur.execute(f'SELECT name, price FROM items WHERE name = "{item["name"]}"')
+                asked_item = cur.fetchall()
+                if not asked_item:
+                    ready.append(item)
+                elif len(asked_item) != 1:
+                    return {'message': "Database error"}, 500
         if ready == items_to_add:
-            store.extend(ready)
-            return store, 201
+            for i in ready:
+                cur.execute(f'INSERT INTO items (name, price) VALUES ("{i["name"]}", {i["price"]})')
+            con.commit()
+            con.close()
+            content = self.get()
+            return content, 201
         elif not ready:
+            con.commit()
+            con.close()
             return {'message': "All elements are given in incorrect form or exist in the store"}, 400
         else:
-            store.extend(ready)
+            for i in ready:
+                cur.execute(f'INSERT INTO items (name, price) VALUES ("{i["name"]}", {i["price"]})')
+            con.commit()
+            con.close()
+            content = self.get()
             return {'message': "Some elements are given in incorrect form or exist in the store",
-                    'store': store}, 201
+                    'store': content}, 201
 
 
 class Item(Resource):
@@ -81,28 +90,34 @@ class Item(Resource):
         return new_item, 201
 
     def put(self, name):
-        asked_item = tuple(filter(lambda i: i['name'] == name, store))
         data = self.parser.parse_args()
-        if asked_item == ():
-            new_item = {'name': name, 'price': data['price']}
-            store.append(new_item)
-            return new_item, 201
-        elif len(asked_item) > 1:
-            return {'message': "Database error"}, 500
+        con = sqlite3.connect('data.db')
+        cur = con.cursor()
+        try:
+            cur.execute(f'INSERT INTO items (name, price) VALUES  ("{name}", {data["price"]})')
+        except sqlite3.IntegrityError:
+            cur.execute(f'UPDATE items SET price = {data["price"]} WHERE name = "{name}"')
+            con.commit()
+            con.close()
+            return {'message': "Item updated successfully", 'item': {'name': name, 'price': data['price']}}, 201
         else:
-            price = data['price']
-            asked_item[0]['price'] = price
-            return asked_item[0], 201
+            con.commit()
+            con.close()
+            return {'message': "Item added successfully", 'item': {'name': name, 'price': data['price']}}, 201
 
     def delete(self, name):
-        asked_item = tuple(filter(lambda i: i['name'] == name, store))
-        if asked_item == ():
+        con = sqlite3.connect('data.db')
+        cur = con.cursor()
+        cur.execute(f'SELECT * FROM items WHERE name="{name}"')
+        asked_item = cur.fetchall()
+        if not asked_item:
             return {'message': "Item wasn't found"}, 405
         elif len(asked_item) > 1:
-            return {'message': "Database error"}, 500
-        else:
-            store.remove(asked_item[0])
-            return {}, 204
+            return {'message': "Database error"}, 405
+        cur.execute(f'DELETE FROM items WHERE name="{name}"')
+        con.commit()
+        con.close()
+        return {}, 204
 
 
 api.add_resource(ItemList, "/items")
